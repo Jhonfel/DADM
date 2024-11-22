@@ -7,9 +7,9 @@
 // GameView.swift
 // GameView.swift
 import SwiftUI
-
 struct GameView: View {
     @StateObject private var viewModel = GameViewModel()
+    @State private var showingDifficultyPicker = false
     
     var body: some View {
         GeometryReader { geometry in
@@ -52,23 +52,81 @@ struct GameView: View {
                 .padding()
                 .disabled(viewModel.isGameOver)
                 
-                if viewModel.isGameOver {
-                    Button("Jugar de nuevo") {
+                Spacer()
+                
+                HStack(spacing: 20) {
+                    // Botón Nuevo Juego
+                    Button(action: {
                         withAnimation {
                             viewModel.resetGame()
                         }
+                    }) {
+                        VStack(spacing: 5) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 30))
+                            Text("Nuevo")
+                                .font(.system(size: 11))
+                        }
+                        .frame(width: 60, height: 60)
+                        .background(Color.green.opacity(0.2))
+                        .foregroundColor(.green)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.green, lineWidth: 2)
+                        )
                     }
-                    .font(.title2)
-                    .padding()
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(10)
-                    .transition(.scale)
-                    .animation(.easeInOut, value: viewModel.isGameOver)
+                    
+                    // Botón Dificultad
+                    Button(action: {
+                        showingDifficultyPicker = true
+                    }) {
+                        VStack(spacing: 5) {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 30))
+                            Text("Nivel")
+                                .font(.system(size: 11))
+                        }
+                        .frame(width: 60, height: 60)
+                        .background(Color.blue.opacity(0.2))
+                        .foregroundColor(.blue)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.blue, lineWidth: 2)
+                        )
+                    }
+                    
+                    // Botón Salir
+                    Button(action: {
+                        exit(0)
+                    }) {
+                        VStack(spacing: 5) {
+                            Image(systemName: "xmark.circle")
+                                .font(.system(size: 30))
+                            Text("Salir")
+                                .font(.system(size: 11))
+                        }
+                        .frame(width: 60, height: 60)
+                        .background(Color.red.opacity(0.2))
+                        .foregroundColor(.red)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.red, lineWidth: 2)
+                        )
+                    }
                 }
-                
-                Spacer()
+                .padding(.horizontal)
+                .padding(.bottom, 30)
             }
+        }
+        .confirmationDialog("Seleccionar Dificultad",
+                          isPresented: $showingDifficultyPicker,
+                          titleVisibility: .visible) {
+            Button("Fácil") { viewModel.setDifficulty(.easy) }
+            Button("Medio") { viewModel.setDifficulty(.medium) }
+            Button("Difícil") { viewModel.setDifficulty(.hard) }
         }
     }
 }
