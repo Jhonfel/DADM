@@ -1,12 +1,5 @@
-//
-//  GameView.swift
-//  Tictactoe
-//
-//  Created by Jhon Felipe Delgado on 16/11/24.
-//
-// GameView.swift
-// GameView.swift
 import SwiftUI
+
 struct GameView: View {
     @StateObject private var viewModel = GameViewModel()
     @State private var showingDifficultyPicker = false
@@ -25,35 +18,18 @@ struct GameView: View {
                     .bold()
                     .padding()
                 
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 15), count: 3), spacing: 15) {
-                    ForEach(0..<9) { index in
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 10)
-                                .foregroundColor(.blue.opacity(0.3))
-                                .aspectRatio(1, contentMode: .fit)
-                            
-                            if let player = viewModel.moves[index] {
-                                Text(player.indicator)
-                                    .font(.system(size: 50))
-                                    .bold()
-                                    .foregroundColor(player == .x ? .red : .blue)
-                                    .transition(.scale.combined(with: .opacity))
-                                    .animation(.spring(response: 0.5, dampingFraction: 0.7), value: viewModel.moves[index])
-                                    .rotationEffect(.degrees(viewModel.moves[index] != nil ? 360 : 0))
-                            }
-                        }
-                        .onTapGesture {
-                            withAnimation {
-                                viewModel.processMove(for: index)
-                            }
-                        }
-                    }
-                }
-                .padding()
-                .disabled(viewModel.isGameOver)
+                // Tablero personalizado
+                CustomBoardView(viewModel: viewModel)
+                    .frame(
+                        width: min(geometry.size.width - 40, 300),
+                        height: min(geometry.size.width - 40, 300)
+                    )
+                    .padding()
+                    .disabled(viewModel.isGameOver)
                 
                 Spacer()
                 
+                // Panel de control
                 HStack(spacing: 20) {
                     // Botón Nuevo Juego
                     Button(action: {
@@ -129,4 +105,8 @@ struct GameView: View {
             Button("Difícil") { viewModel.setDifficulty(.hard) }
         }
     }
+}
+
+#Preview {
+    GameView()
 }
