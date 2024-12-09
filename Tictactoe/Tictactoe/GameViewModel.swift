@@ -2,8 +2,26 @@ import SwiftUI
 import Combine
 import AudioToolbox
 
-enum Difficulty {
-    case easy, medium, hard
+// Enumeración para las claves de UserDefaults
+private enum UserDefaultsKeys {
+    static let humanWins = "humanWins"
+    static let computerWins = "computerWins"
+    static let ties = "ties"
+    static let difficulty = "difficulty"
+}
+
+enum Difficulty: Int {
+    case easy = 0
+    case medium = 1
+    case hard = 2
+    
+    var displayName: String {
+        switch self {
+        case .easy: return "Fácil"
+        case .medium: return "Medio"
+        case .hard: return "Difícil"
+        }
+    }
 }
 
 final class GameViewModel: ObservableObject {
@@ -11,10 +29,19 @@ final class GameViewModel: ObservableObject {
     @Published var isGameOver = false
     @Published var statusText = "Tu turno (X)"
     @Published var winningLine: [Int]?
+    @Published var mHumanWins: Int = 0
+    @Published var mComputerWins: Int = 0
+    @Published var mTies: Int = 0
     
     private var currentPlayer: Player = .x
     private var isComputerEnabled = true
-    private var difficulty: Difficulty = .medium
+    private var isComputerThinking = false
+    
+    @Published private(set) var difficulty: Difficulty {
+        didSet {
+            UserDefaults.standard.set(difficulty.rawValue, forKey: UserDefaultsKeys.difficulty)
+        }
+    }
     
     enum Player {
         case x  // Humano
@@ -29,14 +56,42 @@ final class GameViewModel: ObservableObject {
     }
     
     private let winPatterns: [[Int]] = [
-        [0, 1, 2], [3, 4, 5], [6, 7, 8],
-        [0, 3, 6], [1, 4, 7], [2, 5, 8],
-        [0, 4, 8], [2, 4, 6]
+        [0, 1, 2], [3, 4, 5], [6, 7, 8],  // Horizontales
+        [0, 3, 6], [1, 4, 7], [2, 5, 8],  // Verticales
+        [0, 4, 8], [2, 4, 6]              // Diagonales
     ]
+    
+    init() {
+        // Cargar dificultad guardada
+        let savedDifficulty = UserDefaults.standard.integer(forKey: UserDefaultsKeys.difficulty)
+        self.difficulty = Difficulty(rawValue: savedDifficulty) ?? .medium
+        
+        // Cargar puntuaciones guardadas
+        let defaults = UserDefaults.standard
+        self.mHumanWins = defaults.integer(forKey: UserDefaultsKeys.humanWins)
+        self.mComputerWins = defaults.integer(forKey: UserDefaultsKeys.computerWins)
+        self.mTies = defaults.integer(forKey: UserDefaultsKeys.ties)
+    }
     
     func setDifficulty(_ newDifficulty: Difficulty) {
         difficulty = newDifficulty
+        UserDefaults.standard.set(newDifficulty.rawValue, forKey: UserDefaultsKeys.difficulty)
         resetGame()
+    }
+    
+    private func saveScores() {
+        let defaults = UserDefaults.standard
+        defaults.set(mHumanWins, forKey: UserDefaultsKeys.humanWins)
+        defaults.set(mComputerWins, forKey: UserDefaultsKeys.computerWins)
+        defaults.set(mTies, forKey: UserDefaultsKeys.ties)
+    }
+    
+    func resetScores() {
+        mHumanWins = 0
+        mComputerWins = 0
+        mTies = 0
+        saveScores()
+        statusText = "Puntuaciones reiniciadas"
     }
     
     func processMove(for position: Int) {
@@ -45,31 +100,54 @@ final class GameViewModel: ObservableObject {
             return
         }
         
-        makeMove(at: position, for: .x)
+        makeMove(at: position, for: .x, playSound: true)
         
         if !isGameOver && isComputerEnabled {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            isComputerThinking = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+                guard let self = self, self.isComputerThinking else { return }
                 self.makeComputerMove()
+                self.isComputerThinking = false
             }
         }
     }
     
-    private func makeMove(at position: Int, for player: Player) {
+    private func makeMove(at position: Int, for player: Player, playSound: Bool = false) {
         moves[position] = player
-        SoundManager.playSound(.tap)
+        if playSound {
+            SoundManager.playSound(.tap)
+        }
         
         if let winningPattern = checkWin(for: player) {
+            if player == .x {
+                mHumanWins += 1
+            } else {
+                mComputerWins += 1
+            }
             statusText = player == .x ? "¡Has ganado!" : "¡La computadora ha ganado!"
             isGameOver = true
             winningLine = winningPattern
             SoundManager.playSound(.success)
+            saveScores()
         } else if checkDraw() {
+            mTies += 1
             statusText = "¡Empate!"
             isGameOver = true
             SoundManager.playSound(.error)
+            saveScores()
         } else {
             currentPlayer = currentPlayer == .x ? .o : .x
             statusText = currentPlayer == .x ? "Tu turno (X)" : "Turno de la computadora (O)"
+        }
+    }
+    
+    func cancelComputerMove() {
+        isComputerThinking = false
+    }
+    
+    func checkAndMakeComputerMoveIfNeeded() {
+        if currentPlayer == .o && !isGameOver {
+            makeComputerMove()
         }
     }
     
@@ -160,5 +238,9 @@ final class GameViewModel: ObservableObject {
     
     private func checkDraw() -> Bool {
         return moves.count == 9
+    }
+    
+    deinit {
+        cancelComputerMove()
     }
 }
