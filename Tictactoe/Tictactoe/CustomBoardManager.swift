@@ -1,32 +1,49 @@
 import SwiftUI
 
-struct CustomBoardView: View {
-    @ObservedObject var viewModel: GameViewModel
+struct CellContent<T: ObservableObject>: View {
+    let index: Int
+    @ObservedObject var viewModel: T
+    
+    init(for index: Int, in viewModel: T) {
+        self.index = index
+        self.viewModel = viewModel
+    }
     
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // Grid background
-                GridBackground()
-                
-                // Celdas del juego
-                VStack(spacing: 0) {
-                    ForEach(0..<3) { row in
-                        HStack(spacing: 0) {
-                            ForEach(0..<3) { column in
-                                let index = row * 3 + column
-                                CellView(index: index, viewModel: viewModel)
-                                    .frame(
-                                        width: geometry.size.width/3,
-                                        height: geometry.size.height/3
-                                    )
-                            }
-                        }
+        ZStack {
+            Rectangle()
+                .fill(Color.white)
+            
+            if let player = (viewModel as? GameViewModel)?.moves[index] {
+                Group {
+                    if player == .x {
+                        Image(systemName: "xmark")
+                            .resizable()
+                            .foregroundColor(.red)
+                    } else {
+                        Image(systemName: "circle")
+                            .resizable()
+                            .foregroundColor(.blue)
                     }
                 }
+                .frame(width: 40, height: 40)
+                .transition(.scale.combined(with: .opacity))
+            } else if let player = (viewModel as? OnlineBoardViewModel)?.moves[index] {
+                Group {
+                    if player == .x {
+                        Image(systemName: "xmark")
+                            .resizable()
+                            .foregroundColor(.red)
+                    } else {
+                        Image(systemName: "circle")
+                            .resizable()
+                            .foregroundColor(.blue)
+                    }
+                }
+                .frame(width: 40, height: 40)
+                .transition(.scale.combined(with: .opacity))
             }
         }
-        .aspectRatio(1, contentMode: .fit)
     }
 }
 
@@ -52,6 +69,58 @@ struct GridBackground: View {
             }
             .stroke(Color.gray, lineWidth: 2)
         }
+    }
+}
+
+struct BoardGridView<T: ObservableObject>: View {
+    let geometry: GeometryProxy
+    @ObservedObject var viewModel: T
+    let onPositionTapped: ((Int) -> Void)?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(0..<3, id: \.self) { row in
+                HStack(spacing: 0) {
+                    ForEach(0..<3, id: \.self) { column in
+                        let index = row * 3 + column
+                        Button(action: {
+                            onPositionTapped?(index)
+                        }) {
+                            CellContent(for: index, in: viewModel)
+                        }
+                        .frame(
+                            width: geometry.size.width/3,
+                            height: geometry.size.height/3
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct CustomBoardView<T: ObservableObject>: View {
+    @ObservedObject var viewModel: T
+    var onPositionTapped: ((Int) -> Void)?
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                GridBackground()
+                BoardGridView(
+                    geometry: geometry,
+                    viewModel: viewModel,
+                    onPositionTapped: { position in
+                        if let gameVM = viewModel as? GameViewModel {
+                            gameVM.processMove(for: position)
+                        } else {
+                            onPositionTapped?(position)
+                        }
+                    }
+                )
+            }
+        }
+        .aspectRatio(1, contentMode: .fit)
     }
 }
 
